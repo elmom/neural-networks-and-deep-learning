@@ -140,7 +140,7 @@ function evaluate(net, test_data)
     network outputs the correct result. Note that the neural
     network's output is assumed to be the index of whichever
     neuron in the final layer has the highest activation."
-    test_results = [(maximum(feedforward(net, x)), y)
+    test_results = [(indmax(feedforward(net, x))-1, y)
                     for (x, y) in test_data]
     return sum([Int(x == y) for (x, y) in test_results])
 end
