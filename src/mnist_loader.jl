@@ -43,9 +43,12 @@ function load_data()
     """
     f = gzip.open("../data/mnist.pkl.gz", "rb")
     training_data, validation_data, test_data = cPickle.load(f)
-    f.close()
+    #f.close()
     return (training_data, validation_data, test_data)
 end
+
+columns(M) = [ slice(M,:,i) for i in 1:size(M, 2) ]
+rows(M) = [ slice(M,i,:) for i in 1:size(M, 1) ]
 
 function load_data_wrapper()
     """Return a tuple containing ``(training_data, validation_data,
@@ -69,12 +72,15 @@ function load_data_wrapper()
     turn out to be the most convenient for use in our neural network
     code."""
     tr_d, va_d, te_d = load_data()
-    training_inputs = [reshape(x, (784, 1)) for x in tr_d[1]]
+    #training_inputs = [reshape(x, (784, 1)) for x in tr_d[1]]
+    training_inputs = rows(tr_d[1])
     training_results = [vectorized_result(y) for y in tr_d[2]]
     training_data = zip(training_inputs, training_results)
-    validation_inputs = [reshape(x, (784, 1)) for x in va_d[1]]
+    #validation_inputs = [reshape(x, (784, 1)) for x in va_d[1]]
+    validation_inputs = rows(va_d[1])
     validation_data = zip(validation_inputs, va_d[2])
-    test_inputs = [reshape(x, (784, 1)) for x in te_d[1]]
+    #test_inputs = [reshape(x, (784, 1)) for x in te_d[1]]
+    test_inputs = rows(te_d[1])
     test_data = zip(test_inputs, te_d[2])
     return (training_data, validation_data, test_data)
 end
@@ -85,6 +91,6 @@ function vectorized_result(j)
     (0...9) into a corresponding desired output from the neural
     network."""
     e = zeros((10, 1))
-    e[j] = 1.0
+    e[j+1] = 1.0
     return e
 end
