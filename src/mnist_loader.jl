@@ -1,4 +1,4 @@
-@doc """
+@doc "
 mnist_loader
 ~~~~~~~~~~~~
 
@@ -6,7 +6,9 @@ A library to load the MNIST image data.  For details of the data
 structures that are returned, see the doc strings for ``load_data``
 and ``load_data_wrapper``.  In practice, ``load_data_wrapper`` is the
 function usually called by our neural network code.
-"""
+"
+
+module MNIST_loader
 
 using PyCall
 
@@ -19,7 +21,7 @@ using PyCall
 #import numpy as np
 
 function load_data()
-    """Return the MNIST data as a tuple containing the training data,
+    "Return the MNIST data as a tuple containing the training data,
     the validation data, and the test data.
 
     The ``training_data`` is returned as a tuple with two entries.
@@ -40,7 +42,7 @@ function load_data()
     helpful to modify the format of the ``training_data`` a little.
     That's done in the wrapper function ``load_data_wrapper()``, see
     below.
-    """
+    "
     f = gzip.open("../data/mnist.pkl.gz", "rb")
     training_data, validation_data, test_data = cPickle.load(f)
     #f.close()
@@ -51,7 +53,7 @@ columns(M) = [ slice(M,:,i) for i in 1:size(M, 2) ]
 rows(M) = [ slice(M,i,:) for i in 1:size(M, 1) ]
 
 function load_data_wrapper()
-    """Return a tuple containing ``(training_data, validation_data,
+    "Return a tuple containing ``(training_data, validation_data,
     test_data)``. Based on ``load_data``, but the format is more
     convenient for use in our implementation of neural networks.
 
@@ -70,12 +72,12 @@ function load_data_wrapper()
     Obviously, this means we're using slightly different formats for
     the training data and the validation / test data.  These formats
     turn out to be the most convenient for use in our neural network
-    code."""
+    code."
     tr_d, va_d, te_d = load_data()
     #training_inputs = [reshape(x, (784, 1)) for x in tr_d[1]]
     training_inputs = rows(tr_d[1])
     training_results = [vectorized_result(y) for y in tr_d[2]]
-    training_data = zip(training_inputs, training_results)
+    training_data = collect(zip(training_inputs, training_results))
     #validation_inputs = [reshape(x, (784, 1)) for x in va_d[1]]
     validation_inputs = rows(va_d[1])
     validation_data = zip(validation_inputs, va_d[2])
@@ -86,11 +88,13 @@ function load_data_wrapper()
 end
 
 function vectorized_result(j)
-    """Return a 10-dimensional unit vector with a 1.0 in the jth
+    "Return a 10-dimensional unit vector with a 1.0 in the jth
     position and zeroes elsewhere.  This is used to convert a digit
     (0...9) into a corresponding desired output from the neural
-    network."""
+    network."
     e = zeros((10, 1))
     e[j+1] = 1.0
     return e
+end
+
 end
