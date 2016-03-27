@@ -1,4 +1,8 @@
-numpy
-scikit-learn
-scipy
-Theano
+#Run in a Julia REPL:
+Pkg.add("PyCall")
+Pkg.add("NumericFuns")
+
+#numpy
+#scikit-learn
+#scipy
+#Theano
