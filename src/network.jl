@@ -13,6 +13,7 @@ module NN
 
 #### Libraries
 using NumericFuns
+using Iterators
 
 
 type Network
@@ -46,7 +47,7 @@ function feedforward(net, a)
     return a
 end
 
-function SGD(net, training_data, epochs, mini_batch_size, eta;
+function SGD(net, training_data, epochs, mini_batch_size, η;
         test_data=nothing)
     """Train the neural network using mini-batch stochastic
     gradient descent.  The "training_data" is a list of tuples
@@ -57,43 +58,53 @@ function SGD(net, training_data, epochs, mini_batch_size, eta;
     epoch, and partial progress printed out.  This is useful for
     tracking progress, but slows things down substantially."""
 
+    report_progress(net, 0, test_data)
+    n = length(training_data)
+    for j in 1:epochs
+        @time begin
+            shuffle(training_data)
+            #mini_batches = [
+            #    training_data[k:k+mini_batch_size-1]
+            #    for k in 1:mini_batch_size:n-1]
+            mini_batches = partition(training_data, mini_batch_size)
+            for mini_batch in mini_batches
+                update_mini_batch(net, mini_batch, η)
+            end
+        end
+        report_progress(net, j, test_data)
+    end
+end
+
+function report_progress(net, j, test_data=nothing)
     if test_data != nothing
         n_test = length(test_data)
     end
-    n = length(training_data)
-    for j in 1:epochs
-        shuffle(training_data)
-        mini_batches = [
-            training_data[k:k+mini_batch_size-1]
-            for k in 1:mini_batch_size:n-1]
-        for mini_batch in mini_batches
-            update_mini_batch(net, mini_batch, eta)
-        end
-        if test_data != nothing
-            println("Epoch $j: $(evaluate(net, test_data)) / $n_test")
-        else
-            println("Epoch $j complete")
-        end
+    if test_data != nothing
+        @time println("Epoch $j: $(evaluate(net, test_data)) / $n_test")
+    else
+        println("Epoch $j complete")
     end
 end
 
 init_∇(c) = [zeros(size(b)) for b in c]
 
-function update_mini_batch(net, mini_batch, eta)
+function update_mini_batch(net, mini_batch, η)
     "Update the network's weights and biases by applying
     gradient descent using backpropagation to a single mini batch.
-    The ``mini_batch`` is a list of tuples ``(x, y)``, and ``eta``
+    The ``mini_batch`` is a list of tuples ``(x, y)``, and ``η``
     is the learning rate."
     ∇b = init_∇(net.biases)
     ∇w = init_∇(net.weights)
+    batch_size = length(mini_batch)
     for (x, y) in mini_batch
-        Δ∇b, Δ∇w = backprop(net, x, y)
-        ∇b = [nb+dnb for (nb, dnb) in zip(∇b, Δ∇b)]
-        ∇w = [nw+dnw for (nw, dnw) in zip(∇w, Δ∇w)]
+        δ∇b, δ∇w = backprop(net, x, y)
+        #@code_warntype backprop(net, x, y)
+        ∇b = [nb+dnb for (nb, dnb) in zip(∇b, δ∇b)]
+        ∇w = [nw+dnw for (nw, dnw) in zip(∇w, δ∇w)]
     end
-    net.weights = [w-(eta/length(mini_batch))*nw
+    net.weights = [w-(η/batch_size)*nw
                     for (w, nw) in zip(net.weights, ∇w)]
-    net.biases = [b-(eta/length(mini_batch))*nb
+    net.biases = [b-(η/batch_size)*nb
                    for (b, nb) in zip(net.biases, ∇b)]
 end
 
@@ -116,9 +127,9 @@ function backprop(net, x, y)
         push!(activations, activation)
     end
     # backward pass
-    Δ = cost_derivative(activations[end], y) .* σ_prime(zs[end])
-    ∇b[end] = Δ
-    ∇w[end] = Δ * transpose(activations[end-1])
+    δ = cost_derivative(activations[end], y) .* σ_prime(zs[end])
+    ∇b[end] = δ
+    ∇w[end] = δ * transpose(activations[end-1])
     # Note that the variable l in the loop below is used a little
     # differently to the notation in Chapter 2 of the book.  Here,
     # l = 1 means the last layer of neurons, l = 2 is the
@@ -128,9 +139,9 @@ function backprop(net, x, y)
     for l in 1:net.num_layers-2
         z = zs[end-l]
         sp = σ_prime(z)
-        Δ = transpose(net.weights[end-l+1])*Δ.*sp
-        ∇b[end-l] = Δ
-        ∇w[end-l] = Δ * transpose(activations[end-l-1])
+        δ = transpose(net.weights[end-l+1])*δ.*sp
+        ∇b[end-l] = δ
+        ∇w[end-l] = δ * transpose(activations[end-l-1])
     end
     return (∇b, ∇w)
 end
@@ -151,10 +162,12 @@ function cost_derivative(output_activations, y)
     return (output_activations-y)
 end
 
-function σ(z)
+function sigmoid2(z)
     """The sigmoid function."""
     return 1.0./(1.0+exp(-z))
 end
+
+σ = sigmoid
 
 function σ_prime(z)
     "Derivative of the sigmoid function."
