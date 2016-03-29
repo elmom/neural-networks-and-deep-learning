@@ -19,8 +19,8 @@ using Iterators
 type Network
     num_layers
     sizes
-    biases
-    weights
+    biases::Array{Array{Float32,2},1}
+    weights::Array{Array{Float32,2},1}
 
     function Network(sizes)
         "The list ``sizes`` contains the number of neurons in the
@@ -76,17 +76,16 @@ function SGD(net, training_data, epochs, mini_batch_size, η;
 end
 
 function report_progress(net, j, test_data=nothing)
-    if test_data != nothing
-        n_test = length(test_data)
-    end
-    if test_data != nothing
-        @time println("Epoch $j: $(evaluate(net, test_data)) / $n_test")
-    else
-        println("Epoch $j complete")
-    end
+    println("Epoch $j complete")
 end
 
-init_∇(c) = [zeros(size(b)) for b in c]
+function report_progress(net, j, test_data::AbstractArray)
+    @time println("Epoch $j: $(evaluate(net, test_data)) / $(length(test_data))")
+end
+
+init_∇(c) = [zeros(b) for b in c]
+
+zipsum(A, B) = [A_l+B_l for (A_l, B_l) in zip(A, B)]
 
 function update_mini_batch(net, mini_batch, η)
     "Update the network's weights and biases by applying
@@ -99,8 +98,10 @@ function update_mini_batch(net, mini_batch, η)
     for (x, y) in mini_batch
         δ∇b, δ∇w = backprop(net, x, y)
         #@code_warntype backprop(net, x, y)
-        ∇b = [nb+dnb for (nb, dnb) in zip(∇b, δ∇b)]
-        ∇w = [nw+dnw for (nw, dnw) in zip(∇w, δ∇w)]
+        #∇b = [∇b_l+δ∇b_l for (∇b_l, δ∇b_l) in zip(∇b, δ∇b)]
+        #∇w = [∇w_l+δ∇w_l for (nw_l, δ∇w_l) in zip(∇w, δ∇w)]
+        ∇b = zipsum(∇b, δ∇b)
+        ∇w = zipsum(∇w, δ∇w)
     end
     net.weights = [w-(η/batch_size)*nw
                     for (w, nw) in zip(net.weights, ∇w)]
@@ -127,7 +128,7 @@ function backprop(net, x, y)
         push!(activations, activation)
     end
     # backward pass
-    δ = cost_derivative(activations[end], y) .* σ_prime(zs[end])
+    δ = δ_L(activations[end], y, zs[end])
     ∇b[end] = δ
     ∇w[end] = δ * transpose(activations[end-1])
     # Note that the variable l in the loop below is used a little
@@ -138,22 +139,18 @@ function backprop(net, x, y)
     # that Python can use negative indices in lists.
     for l in 1:net.num_layers-2
         z = zs[end-l]
-        sp = σ_prime(z)
-        δ = transpose(net.weights[end-l+1])*δ.*sp
+        σ_p = σ_prime(z)
+        w = net.weights[end-l+1]
+        δ = transpose(w)*δ.*σ_p
+        a = activations[end-l-1]
         ∇b[end-l] = δ
-        ∇w[end-l] = δ * transpose(activations[end-l-1])
+        ∇w[end-l] = δ * transpose(a)
     end
     return (∇b, ∇w)
 end
 
-function evaluate(net, test_data)
-    "Return the number of test inputs for which the neural
-    network outputs the correct result. Note that the neural
-    network's output is assumed to be the index of whichever
-    neuron in the final layer has the highest activation."
-    test_results = [(indmax(feedforward(net, x))-1, y)
-                    for (x, y) in test_data]
-    return sum([Int(x == y) for (x, y) in test_results])
+function δ_L(a, y, z)
+    return cost_derivative(a, y) .* σ_prime(z)
 end
 
 function cost_derivative(output_activations, y)
@@ -168,10 +165,21 @@ function sigmoid2(z)
 end
 
 σ = sigmoid
+#σ = sigmoid2
 
 function σ_prime(z)
     "Derivative of the sigmoid function."
     return σ(z) .* (1-σ(z))
+end
+
+function evaluate(net, test_data)
+    "Return the number of test inputs for which the neural
+    network outputs the correct result. Note that the neural
+    network's output is assumed to be the index of whichever
+    neuron in the final layer has the highest activation."
+    test_results = [(indmax(feedforward(net, x))-1, y)
+                    for (x, y) in test_data]
+    return sum([Int(x == y) for (x, y) in test_results])
 end
 
 end
